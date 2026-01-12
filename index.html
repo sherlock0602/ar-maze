@@ -1,55 +1,49 @@
 <!DOCTYPE html>
 <html>
-  <head>
+<head>
     <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>操場迷宮測試 - WebAR</title>
+    <title>AR 迷宮除錯版</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
-  </head>
+</head>
+<body style="margin: 0; overflow: hidden;">
+    <div id="debug" style="position: fixed; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.5); color: white; padding: 10px; font-family: sans-serif;">
+        等待 GPS 訊號...
+    </div>
 
-  <body style="margin: 0; overflow: hidden;">
     <a-scene
-      vr-mode-ui="enabled: false"
-      embedded
-      arjs="sourceType: webcam; debugUIEnabled: false;"
+        vr-mode-ui="enabled: false"
+        embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;"
     >
-      <a-box
-        material="color: red; opacity: 0.7;"
-        scale="5 5 5"
-        gps-entity-place="latitude: <LAT>; longitude: <LON>;"
-      >
-      </a-box>
+        <a-box id="maze-wall" material="color: yellow; opacity: 0.8;" scale="10 10 10"></a-box>
 
-      <a-text
-        value="這是一道迷宮牆"
-        look-at="[gps-camera]"
-        scale="15 15 15"
-        gps-entity-place="latitude: <LAT>; longitude: <LON>;"
-        position="0 10 0"
-      ></a-text>
-
-      <a-camera gps-camera rotation-reader> </a-camera>
+        <a-camera gps-camera rotation-reader look-controls-enabled="true"> </a-camera>
     </a-scene>
 
     <script>
-      // 自動獲取你目前的位置，並把方塊放在你附近
-      window.onload = () => {
-        navigator.geolocation.getCurrentPosition((position) => {
-          const lat = position.coords.latitude;
-          const lon = position.coords.longitude;
-          
-          // 稍微偏移一點點（約往北移動 0.0001 度），讓方塊出現在你面前
-          const testLat = lat + 0.0001;
-          const testLon = lon;
+        window.onload = () => {
+            const debugEl = document.getElementById('debug');
+            
+            navigator.geolocation.watchPosition((position) => {
+                const lat = position.coords.latitude;
+                const lon = position.coords.longitude;
+                
+                debugEl.innerText = `目前位置: ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
 
-          document.querySelectorAll('[gps-entity-place]').forEach((el) => {
-            el.setAttribute('gps-entity-place', `latitude: ${testLat}; longitude: ${testLon};`);
-          });
-          console.log(`位置已設定: ${testLat}, ${testLon}`);
-        });
-      };
+                // 設定方塊在你北方 10 公尺處
+                const targetLat = lat + 0.0001; 
+                const targetLon = lon;
+                
+                const wall = document.getElementById('maze-wall');
+                wall.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon};`);
+            }, (err) => {
+                debugEl.innerText = "錯誤: " + err.message;
+            }, {
+                enableHighAccuracy: true, // 強制使用高精度 GPS
+                maximumAge: 0
+            });
+        };
     </script>
-  </body>
+</body>
 </html>
