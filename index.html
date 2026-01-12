@@ -2,47 +2,72 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>AR 迷宮除錯版</title>
+    <title>AR 操場迷宮 - 穩定測試版</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <style>
+        .ui { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; font-family: sans-serif; text-align: center; width: 80%; }
+    </style>
 </head>
 <body style="margin: 0; overflow: hidden;">
-    <div id="debug" style="position: fixed; top: 10px; left: 10px; z-index: 10; background: rgba(0,0,0,0.5); color: white; padding: 10px; font-family: sans-serif;">
-        等待 GPS 訊號...
+    <div class="ui">
+        <div id="status">正在搜尋衛星訊號...</div>
+        <div id="dist">距離方塊：-- 公尺</div>
     </div>
 
     <a-scene
         vr-mode-ui="enabled: false"
         embedded
-        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;"
+        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
     >
-        <a-box id="maze-wall" material="color: yellow; opacity: 0.8;" scale="10 10 10"></a-box>
+        <a-cylinder id="maze-wall" material="color: #4df235; opacity: 0.9;" height="20" radius="2"></a-cylinder>
 
-        <a-camera gps-camera rotation-reader look-controls-enabled="true"> </a-camera>
+        <a-camera gps-camera="simulateAltitude: 1.6; minDistance: 1;" rotation-reader> </a-camera>
     </a-scene>
 
     <script>
+        let hasPlaced = false;
+        const statusEl = document.getElementById('status');
+        const distEl = document.getElementById('dist');
+
         window.onload = () => {
-            const debugEl = document.getElementById('debug');
-            
+            // 使用最高精準度追蹤
             navigator.geolocation.watchPosition((position) => {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
-                
-                debugEl.innerText = `目前位置: ${lat.toFixed(6)}, ${lon.toFixed(6)}`;
+                const accuracy = position.coords.accuracy;
 
-                // 設定方塊在你北方 10 公尺處
-                const targetLat = lat + 0.0001; 
-                const targetLon = lon;
-                
-                const wall = document.getElementById('maze-wall');
-                wall.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon};`);
+                statusEl.innerText = `GPS 精度: ${accuracy.toFixed(1)} 公尺`;
+
+                // 當精度小於 20 公尺時才放置方塊，避免方塊「黏」在身上
+                if (!hasPlaced && accuracy < 20) {
+                    // 將方塊放在你目前位置北方約 15 公尺處
+                    const targetLat = lat + 0.00015; 
+                    const targetLon = lon;
+                    
+                    const wall = document.getElementById('maze-wall');
+                    wall.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon};`);
+                    hasPlaced = true;
+                    statusEl.innerText = "方塊已放置在北方 15m 處！";
+                }
             }, (err) => {
-                debugEl.innerText = "錯誤: " + err.message;
+                statusEl.innerText = "錯誤: " + err.message + " (請檢查手機定位權限)";
             }, {
-                enableHighAccuracy: true, // 強制使用高精度 GPS
-                maximumAge: 0
+                enableHighAccuracy: true,
+                maximumAge: 0,
+                timeout: 27000
             });
+
+            // 每秒計算一次距離
+            setInterval(() => {
+                const camera = document.querySelector('[gps-camera]');
+                const wall = document.getElementById('maze-wall');
+                if (camera && wall && hasPlaced) {
+                    // AR.js 會自動計算距離並存放在 components 中
+                    const dist = wall.components['gps-entity-place'].distanceToCamera;
+                    distEl.innerText = `距離方塊：${dist.toFixed(1)} 公尺`;
+                }
+            }, 1000);
         };
     </script>
 </body>
