@@ -2,73 +2,69 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>AR 操場迷宮 - 穩定測試版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AR 終極相容版</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <style>
-        .ui { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(0,0,0,0.7); color: white; padding: 15px; border-radius: 10px; font-family: sans-serif; text-align: center; width: 80%; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; }
+        .ui { position: fixed; top: 10px; left: 10px; z-index: 50; background: rgba(0,0,0,0.6); color: white; padding: 10px; border-radius: 5px; pointer-events: none; }
+        button { padding: 15px 30px; font-size: 20px; cursor: pointer; border-radius: 10px; border: none; background: #28a745; color: white; }
     </style>
 </head>
+
 <body style="margin: 0; overflow: hidden;">
-    <div class="ui">
-        <div id="status">正在搜尋衛星訊號...</div>
-        <div id="dist">距離方塊：-- 公尺</div>
+    <div id="overlay">
+        <h2>操場迷宮 AR 測試</h2>
+        <p>請到戶外開闊處使用</p>
+        <button onclick="startAR()">點擊開始遊戲</button>
     </div>
+
+    <div class="ui" id="debug-info">等待按鈕點擊...</div>
 
     <a-scene
         vr-mode-ui="enabled: false"
         embedded
-        arjs="sourceType: webcam; debugUIEnabled: false; trackingMethod: best;"
+        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true; trackingMethod: best;"
     >
-        <a-cylinder id="maze-wall" material="color: #4df235; opacity: 0.9;" height="20" radius="2"></a-cylinder>
-
-        <a-camera gps-camera="simulateAltitude: 1.6; minDistance: 1;" rotation-reader> </a-camera>
+        <a-box id="target" material="color: red; opacity: 0.8;" scale="10 20 10"></a-box>
+        
+        <a-camera gps-camera="minDistance: 1;" rotation-reader></a-camera>
     </a-scene>
 
     <script>
+        const debug = document.getElementById('debug-info');
         let hasPlaced = false;
-        const statusEl = document.getElementById('status');
-        const distEl = document.getElementById('dist');
 
-        window.onload = () => {
-            // 使用最高精準度追蹤
+        function startAR() {
+            document.getElementById('overlay').style.display = 'none';
+            debug.innerText = "正在獲取 GPS 精度...";
+
+            // 請求感測器權限 (iOS 13+ 需要)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission();
+            }
+
             navigator.geolocation.watchPosition((position) => {
                 const lat = position.coords.latitude;
                 const lon = position.coords.longitude;
-                const accuracy = position.coords.accuracy;
+                const acc = position.coords.accuracy;
 
-                statusEl.innerText = `GPS 精度: ${accuracy.toFixed(1)} 公尺`;
+                debug.innerText = `精度: ${acc.toFixed(1)}m | 座標: ${lat.toFixed(4)},${lon.toFixed(4)}`;
 
-                // 當精度小於 20 公尺時才放置方塊，避免方塊「黏」在身上
-                if (!hasPlaced && accuracy < 20) {
-                    // 將方塊放在你目前位置北方約 15 公尺處
-                    const targetLat = lat + 0.00015; 
+                if (!hasPlaced && acc < 30) {
+                    // 放在你前方約 10 公尺
+                    const targetLat = lat + 0.0001;
                     const targetLon = lon;
-                    
-                    const wall = document.getElementById('maze-wall');
-                    wall.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon};`);
+                    const el = document.getElementById('target');
+                    el.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon};`);
                     hasPlaced = true;
-                    statusEl.innerText = "方塊已放置在北方 15m 處！";
+                    console.log("方塊已部署");
                 }
             }, (err) => {
-                statusEl.innerText = "錯誤: " + err.message + " (請檢查手機定位權限)";
-            }, {
-                enableHighAccuracy: true,
-                maximumAge: 0,
-                timeout: 27000
-            });
-
-            // 每秒計算一次距離
-            setInterval(() => {
-                const camera = document.querySelector('[gps-camera]');
-                const wall = document.getElementById('maze-wall');
-                if (camera && wall && hasPlaced) {
-                    // AR.js 會自動計算距離並存放在 components 中
-                    const dist = wall.components['gps-entity-place'].distanceToCamera;
-                    distEl.innerText = `距離方塊：${dist.toFixed(1)} 公尺`;
-                }
-            }, 1000);
-        };
+                debug.innerText = "GPS 錯誤: " + err.message;
+            }, { enableHighAccuracy: true });
+        }
     </script>
 </body>
 </html>
