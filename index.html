@@ -3,84 +3,56 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AR 操場定位校正版</title>
+    <title>AR 空間追蹤版 (不靠GPS)</title>
     <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
-        .debug-panel {
-            position: fixed; top: 10px; left: 10px; z-index: 999;
-            background: rgba(0,0,0,0.8); color: white; padding: 15px; font-family: monospace;
+        body { margin: 0; overflow: hidden; }
+        .ui {
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 100; background: rgba(0,0,0,0.8); color: white;
+            padding: 20px; border-radius: 15px; text-align: center; width: 80%;
         }
+        button { padding: 10px 20px; font-size: 18px; background: #007bff; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
-
 <body>
-    <div class="debug-panel" id="debug">初始化 GPS...</div>
 
-    <a-scene
-        embedded
-        vr-mode-ui="enabled: false"
-        arjs="sourceType: webcam; debugUIEnabled: false; videoTexture: true;"
-    >
-        <a-entity id="target-container">
-            <a-cylinder id="maze-wall" material="color: #00ff00; opacity: 0.8;" height="15" radius="1.5"></a-cylinder>
+    <div class="ui" id="overlay">
+        <p>請站在起始點，面向前方</p>
+        <button onclick="startExperience()">設定起始點並開始</button>
+    </div>
+
+    <a-scene webxr="optionalFeatures: hit-test, local-floor" renderer="antialias: true;">
+        
+        <a-entity id="maze">
+            <a-box position="0 1 -3" material="color: red; opacity: 0.7;"></a-box>
+            <a-box position="2 1 -5" material="color: green; opacity: 0.7;"></a-box>
+            <a-box position="-2 1 -5" material="color: blue; opacity: 0.7;"></a-box>
+            
+            <a-grid></a-grid>
         </a-entity>
 
-        <a-camera 
-            gps-camera="gpsMinDistance: 1; alert: true; simulateAltitude: 1.6;" 
-            rotation-reader>
+        <a-camera position="0 1.6 0" look-controls wasd-controls-enabled="false">
         </a-camera>
+
+        <a-sky id="sky" color="#ECECEC" opacity="0"></a-sky> 
     </a-scene>
 
     <script>
-        const debug = document.getElementById('debug');
-        let targetLat, targetLon;
-        let hasInitialized = false;
-
-        // 當位置改變時觸發
-        window.addEventListener('gps-camera-update-position', (e) => {
-            const pos = e.detail.position;
-            debug.innerText = `目前位置: ${pos.latitude.toFixed(6)}, ${pos.longitude.toFixed(6)}\n狀態: 已抓取位移`;
-        });
-
-        navigator.geolocation.watchPosition((position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            const acc = position.coords.accuracy;
-
-            if (!hasInitialized && acc < 20) {
-                // 初始化：把綠色柱子放在你現在位置往北 15 公尺
-                // 0.00015 度約等於 15-17 公尺
-                targetLat = lat + 0.00015;
-                targetLon = lon;
-                
-                const wall = document.getElementById('maze-wall');
-                wall.setAttribute('gps-entity-place', `latitude: ${targetLat}; longitude: ${targetLon};`);
-                
-                hasInitialized = true;
-                console.log("目標已設定在座標:", targetLat, targetLon);
+        function startExperience() {
+            document.getElementById('overlay').style.display = 'none';
+            
+            // 請求權限 (iOS 必要)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission();
             }
-
-            if(hasInitialized) {
-                // 每秒顯示你與目標的實際距離
-                const dist = calculateDistance(lat, lon, targetLat, targetLon);
-                debug.innerHTML += `<br>距離目標: ${dist.toFixed(1)} 公尺\n精度: ${acc.toFixed(1)}m`;
+            
+            // 進入 VR/AR 模式，讓瀏覽器啟動空間追蹤
+            const scene = document.querySelector('a-scene');
+            if (scene.enterVR) {
+                // 在手持裝置上，這會切換到 WebXR 模式
+                console.log("進入空間追蹤模式");
             }
-        }, (err) => {
-            debug.innerText = "GPS 錯誤: " + err.message;
-        }, { enableHighAccuracy: true, maximumAge: 0 });
-
-        // 計算兩點經緯度距離的函數 (Haversine formula)
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // 地球半徑 (公尺)
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
         }
     </script>
 </body>
